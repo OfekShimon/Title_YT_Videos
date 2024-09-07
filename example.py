@@ -13,8 +13,8 @@ import yt8m_crawler
 
 # data type in the tfrecords: video/frame
 # refrence: https://research.google.com/youtube8m/download.html
-# Frame level tf records: http://us.data.yt8m.org/2/frame/train/index.html          same with validate and text
-# Video level tf records: http://us.data.yt8m.org/2/video/train/index.html          same with validate and text
+# Frame level tf records: http://eu.data.yt8m.org/2/frame/train/index.html          same with validate and text
+# Video level tf records: http://eu.data.yt8m.org/2/video/train/index.html          same with validate and text
 data_type = "frame"
 # Where to download tfrecords from
 base_url = "http://eu.data.yt8m.org/2"
@@ -42,12 +42,16 @@ if __name__ == "__main__":
     rows = []
 
     # Iterate the contents of the TensorFlow record
-    for example in tf.data.TFRecordDataset(frame_lvl_record).take(10):
+    for example in tf.data.TFRecordDataset(frame_lvl_record).take(100):
         tf_example = tf.train.SequenceExample.FromString(example.numpy())
         
         # Once we have the structured data, we can extract the relevant features (id and labels)
         vid_ids.append(tf_example.context.feature['id'].bytes_list.value[0].decode(encoding='UTF-8'))
         yt8m_id = vid_ids[-1]
+        real_id = yt8m_crawler.get_real_id(yt8m_id)
+        if real_id is None:
+            print(f'Error fetching video details: unable to get the real id of {yt8m_id}')
+            continue
         labels.append(tf_example.context.feature['labels'].int64_list.value)
         
         n_frames = len(tf_example.feature_lists.feature_list['audio'].feature)
@@ -68,11 +72,8 @@ if __name__ == "__main__":
         feat_rgb.append(rgb_frame)
         feat_audio.append(audio_frame)
         
-        try:
-            # Get the yt-dlp metadata
-            data_video = yt8m_crawler.fetch_yt8m_video_details(yt8m_id)
-        except:
-            e = sys.exc_info()
+        # Get the yt-dlp metadata
+        data_video = yt8m_crawler.fetch_video_details(real_id)
         
         if data_video:
             # We are interested in expanding the labels information with features such as title, 
@@ -84,7 +85,7 @@ if __name__ == "__main__":
             duration = data_video['duration']
             
             # Collect the data in the dataframe
-            rows.append({'id': yt8m_crawler.get_real_id(yt8m_id), 
+            rows.append({'id': real_id, 
                                 'title': title, 
                                 'creator': creator, 
                                 'views': views,
