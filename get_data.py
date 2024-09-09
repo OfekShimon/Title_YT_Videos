@@ -136,5 +136,3 @@ def main():
     print("Vocabulary size:", len(tokenizer.word_index) + 1)
     print("\nExample decoded title:")
     print(decode_title(y[0], tokenizer))
-
-main()
