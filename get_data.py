@@ -16,16 +16,18 @@ def get_data_by_amount(tfrecords_amount=100):
     data_type = "frame"
     base_url = "http://eu.data.yt8m.org/2"
     download_dir = "data/yt8m"
-
-    yt8m_downloader.download_tfrecords(base_url, download_dir, data_type, 'train', tfrecords_amount)
-    yt8m_downloader.download_tfrecords(base_url, download_dir, data_type, 'validate', tfrecords_amount)
-    yt8m_downloader.download_tfrecords(base_url, download_dir, data_type, 'test', tfrecords_amount)
+    #
+    # yt8m_downloader.download_tfrecords(base_url, download_dir, data_type, 'train', tfrecords_amount)
+    # yt8m_downloader.download_tfrecords(base_url, download_dir, data_type, 'validate', tfrecords_amount)
+    # yt8m_downloader.download_tfrecords(base_url, download_dir, data_type, 'test', tfrecords_amount)
 
     frame_lvl_record = "data/yt8m/frame/train/train00.tfrecord"
 
     input_output = []
 
-    for example in tf.data.TFRecordDataset(frame_lvl_record).take(10):
+    # for example in tf.data.TFRecordDataset(frame_lvl_record).take(10):
+
+    for example in tf.data.TFRecordDataset(frame_lvl_record).take(100):
         tf_example = tf.train.SequenceExample.FromString(example.numpy())
 
         vid_id = tf_example.context.feature['id'].bytes_list.value[0].decode(encoding='UTF-8')
@@ -72,79 +74,7 @@ def get_data_by_amount(tfrecords_amount=100):
     print(f"Processed and saved {len(input_output)} samples")
     return input_output
 
-def load_and_prepare_data(pickle_file_path='input_output_data.pkl', max_title_length=20, max_frames=300):
-    # Load the pickle file
-    with open(pickle_file_path, 'rb') as f:
-        data = pickle.load(f)
 
-    # Prepare X (input features)
-    X_rgb = []
-    X_audio = []
-    titles = []
-    y = []
-
-    for item in data:
-        rgb_frames = item['input']['rgb']
-        audio_frames = item['input']['audio']
-
-        # Pad or truncate the frames
-        if len(rgb_frames) > max_frames:
-            rgb_frames = rgb_frames[:max_frames]
-            audio_frames = audio_frames[:max_frames]
-        else:
-            rgb_frames = rgb_frames + [[0] * len(rgb_frames[0])] * (max_frames - len(rgb_frames))
-            audio_frames = audio_frames + [[0] * len(audio_frames[0])] * (max_frames - len(audio_frames))
-
-        X_rgb.append(rgb_frames)
-        X_audio.append(audio_frames)
-        titles.append(item['metadata']['title'])
-        y.append(item['output'])
-
-    # Convert lists to numpy arrays
-    X_rgb = np.array(X_rgb)
-    X_audio = np.array(X_audio)
-
-    # Prepare y (output labels)
-    # Tokenize the titles
-    tokenizer = Tokenizer()
-    tokenizer.fit_on_texts(titles)
-    title_sequences = tokenizer.texts_to_sequences(titles)
-
-    # Pad the sequences
-    title_sequences = pad_sequences(title_sequences, maxlen=max_title_length, padding='post')
-
-    return X_rgb, X_audio, np.array(y), np.array(title_sequences), tokenizer
-
-# Usage in main function
-def main():
-    get_data_by_amount(100)
-    X_rgb, X_audio, y_labels, y_titles, tokenizer = load_and_prepare_data()
-
-    print("Shape of X_rgb:", X_rgb.shape)
-    print("Shape of X_audio:", X_audio.shape)
-    print("Shape of y_labels:", y_labels.shape)
-    print("Shape of y_titles:", y_titles.shape)
-    print("Vocabulary size:", len(tokenizer.word_index) + 1)
-    print("\nExample decoded title:")
-    print(decode_title(y_titles[0], tokenizer))
-    print("Example labels:", y_labels[0])
-
-# Main call
-if __name__ == "__main__":
-    main()
-
-if __name__ == "__main__":
-    # Get and save data
-    input_output_data = get_data_by_amount(100)
-
-    print(f"Processed and saved {len(input_output_data)} samples")
-
-    # Load data in another session or script
-    loaded_data = load_input_output_data()
-
-    # Use the loaded data
-    print(f"Loaded {len(loaded_data)} samples")
-    print("First sample metadata:", loaded_data[0]['metadata'])
 
 def load_and_prepare_data(pickle_file_path='input_output_data.pkl', max_title_length=20, max_frames=300):
     # Load the pickle file
@@ -189,10 +119,6 @@ def load_and_prepare_data(pickle_file_path='input_output_data.pkl', max_title_le
     y = np.array(y)
 
     return X_rgb, X_audio, y, tokenizer
-
-
-
-
 
 # Example of how to get the original title from y
 def decode_title(encoded_title, tokenizer):
