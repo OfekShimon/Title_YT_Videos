@@ -22,50 +22,61 @@ def get_data_by_amount(tfrecords_amount=100):
     # yt8m_downloader.download_tfrecords(base_url, download_dir, data_type, 'test', tfrecords_amount)
 
     frame_lvl_record = "data/yt8m/frame/train/train00.tfrecord"
+    folder_path = 'data/yt8m/frame/train'
 
-    input_output = []
+    # Get a list of all TFRecord files in the folder
+    tfrecord_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.tfrecord')]
 
-    # for example in tf.data.TFRecordDataset(frame_lvl_record).take(10):
+    #limit to 10 files, for testing purposes
+    tfrecord_files = tfrecord_files[:10]
 
-    for example in tf.data.TFRecordDataset(frame_lvl_record).take(100):
-        tf_example = tf.train.SequenceExample.FromString(example.numpy())
+    # Loop through each TFRecord file
+    for tfrecord_file in tfrecord_files:
+        print(tfrecord_file)
 
-        vid_id = tf_example.context.feature['id'].bytes_list.value[0].decode(encoding='UTF-8')
-        labels = list(tf_example.context.feature['labels'].int64_list.value)  # Convert to list
+        input_output = []
 
-        n_frames = len(tf_example.feature_lists.feature_list['audio'].feature)
-        rgb_frames = []
-        audio_frames = []
+        # for example in tf.data.TFRecordDataset(frame_lvl_record).take(10):
 
-        for i in range(n_frames):
-            rgb_data = tf.io.decode_raw(tf_example.feature_lists.feature_list['rgb'].feature[i].bytes_list.value[0], tf.uint8)
-            rgb_frames.append(tf.cast(rgb_data, tf.float32).numpy().tolist())  # Convert to list
+        for example in tf.data.TFRecordDataset(tfrecord_file).take(10):
+            tf_example = tf.train.SequenceExample.FromString(example.numpy())
 
-            audio_data = tf.io.decode_raw(tf_example.feature_lists.feature_list['audio'].feature[i].bytes_list.value[0], tf.uint8)
-            audio_frames.append(tf.cast(audio_data, tf.float32).numpy().tolist())  # Convert to list
+            vid_id = tf_example.context.feature['id'].bytes_list.value[0].decode(encoding='UTF-8')
+            labels = list(tf_example.context.feature['labels'].int64_list.value)  # Convert to list
 
-        try:
-            data_video = yt8m_crawler.fetch_yt8m_video_details(vid_id)
-        except Exception as e:
-            print(f"Error fetching video details for {vid_id}: {str(e)}")
-            continue
+            n_frames = len(tf_example.feature_lists.feature_list['audio'].feature)
+            rgb_frames = []
+            audio_frames = []
 
-        if data_video:
-            input_output.append({
-                'input': {
-                    'rgb': rgb_frames,
-                    'audio': audio_frames
-                },
-                'output': labels,
-                'metadata': {
-                    'id': yt8m_crawler.get_real_id(vid_id),
-                    'title': data_video.get('title', ''),
-                    'creator': data_video.get('uploader', ''),
-                    'views': data_video.get('view_count', 0),
-                    'likes': data_video.get('like_count', 0),
-                    'duration': data_video.get('duration', 0)
-                }
-            })
+            for i in range(n_frames):
+                rgb_data = tf.io.decode_raw(tf_example.feature_lists.feature_list['rgb'].feature[i].bytes_list.value[0], tf.uint8)
+                rgb_frames.append(tf.cast(rgb_data, tf.float32).numpy().tolist())  # Convert to list
+
+                audio_data = tf.io.decode_raw(tf_example.feature_lists.feature_list['audio'].feature[i].bytes_list.value[0], tf.uint8)
+                audio_frames.append(tf.cast(audio_data, tf.float32).numpy().tolist())  # Convert to list
+
+            try:
+                data_video = yt8m_crawler.fetch_yt8m_video_details(vid_id)
+            except Exception as e:
+                print(f"Error fetching video details for {vid_id}: {str(e)}")
+                continue
+
+            if data_video:
+                input_output.append({
+                    'input': {
+                        'rgb': rgb_frames,
+                        'audio': audio_frames
+                    },
+                    'output': labels,
+                    'metadata': {
+                        'id': yt8m_crawler.get_real_id(vid_id),
+                        'title': data_video.get('title', ''),
+                        'creator': data_video.get('uploader', ''),
+                        'views': data_video.get('view_count', 0),
+                        'likes': data_video.get('like_count', 0),
+                        'duration': data_video.get('duration', 0)
+                    }
+                })
 
     # Save input_output data
     with open('input_output_data.pkl', 'wb') as f:
