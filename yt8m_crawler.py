@@ -1,4 +1,4 @@
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 # pip install yt-dlp
 import yt_dlp
@@ -7,7 +7,14 @@ import yt_dlp
 # Function to map the yt8m id to the real YouTube video id
 def get_real_id(yt8m_id):
     url = 'http://data.yt8m.org/2/j/i/{}/{}.js'.format(yt8m_id[0:2], yt8m_id)
-    request = urlopen(url).read()
+    req = Request(
+        url, 
+        headers={'User-Agent': 'Mozilla/6.0'}
+    )
+    try:
+        request = urlopen(req).read()
+    except:
+        return None
     real_id = request.decode()
     return real_id[real_id.find(',') + 2:real_id.find(')') - 1]
 
