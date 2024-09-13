@@ -49,3 +49,10 @@ def download_tfrecords(base_url, download_dir, data_type, type, amount):
     
     for i in range(amount):
         download_tfrecord(base_url + '/' + data_type + '/' + type + '/' + type + int_to_index(i) + '.tfrecord', download_dir)
+
+def download_tfrecord_by_index(base_url, download_dir, data_type, type, index):
+    download_dir = download_dir + '/' + data_type + '/' + type
+    # Create the directory if it doesn't exist
+    os.makedirs(download_dir, exist_ok=True)
+    download_tfrecord(base_url + '/' + data_type + '/' + type + '/' + type + int_to_index(index) + '.tfrecord', download_dir)
+    return download_dir + '/' + type + int_to_index(index) + '.tfrecord'

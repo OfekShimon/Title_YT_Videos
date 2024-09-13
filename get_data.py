@@ -11,38 +11,33 @@ import pickle
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 
-
-def get_data_by_amount(tfrecords_amount=100):
+def get_data_by_amount(data_amount=1000, type='train'):
     data_type = "frame"
     base_url = "http://eu.data.yt8m.org/2"
     download_dir = "data/yt8m"
-    #
-    # yt8m_downloader.download_tfrecords(base_url, download_dir, data_type, 'train', tfrecords_amount)
-    # yt8m_downloader.download_tfrecords(base_url, download_dir, data_type, 'validate', tfrecords_amount)
-    # yt8m_downloader.download_tfrecords(base_url, download_dir, data_type, 'test', tfrecords_amount)
-
-    frame_lvl_record = "data/yt8m/frame/train/train00.tfrecord"
-    folder_path = 'data/yt8m/frame/train'
-
-    # Get a list of all TFRecord files in the folder
-    tfrecord_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.tfrecord')]
-
-    #limit to 10 files, for testing purposes
-    tfrecord_files = tfrecord_files[:10]
+    
+    tfrecord_index = 0
+    count = 0
 
     # Loop through each TFRecord file
-    for tfrecord_file in tfrecord_files:
-        print(tfrecord_file)
+    while count < data_amount and tfrecord_index <= 3843: # 3843 is the last file
+        # download and get the name of the current tfrecord
+        tfrecord_file = yt8m_downloader.download_tfrecord_by_index(base_url, download_dir, data_type, type, tfrecord_index)
+        tfrecord_index += 1
+        print(f"[{type}] working on {tfrecord_file}")
 
         input_output = []
 
-        # for example in tf.data.TFRecordDataset(frame_lvl_record).take(10):
-
-        for example in tf.data.TFRecordDataset(tfrecord_file).take(10):
+        for example in tf.data.TFRecordDataset(tfrecord_file):
             tf_example = tf.train.SequenceExample.FromString(example.numpy())
 
-            vid_id = tf_example.context.feature['id'].bytes_list.value[0].decode(encoding='UTF-8')
+            yt8m_id = tf_example.context.feature['id'].bytes_list.value[0].decode(encoding='UTF-8')
+            vid_id = yt8m_crawler.get_real_id(yt8m_id)
             labels = list(tf_example.context.feature['labels'].int64_list.value)  # Convert to list
+            
+            if vid_id is None:
+                print(f'Error fetching video details: unable to get the real id of {yt8m_id}')
+                continue
 
             n_frames = len(tf_example.feature_lists.feature_list['audio'].feature)
             rgb_frames = []
@@ -56,7 +51,7 @@ def get_data_by_amount(tfrecords_amount=100):
                 audio_frames.append(tf.cast(audio_data, tf.float32).numpy().tolist())  # Convert to list
 
             try:
-                data_video = yt8m_crawler.fetch_yt8m_video_details(vid_id)
+                data_video = yt8m_crawler.fetch_video_details(vid_id)
             except Exception as e:
                 print(f"Error fetching video details for {vid_id}: {str(e)}")
                 continue
@@ -69,7 +64,7 @@ def get_data_by_amount(tfrecords_amount=100):
                     },
                     'output': labels,
                     'metadata': {
-                        'id': yt8m_crawler.get_real_id(vid_id),
+                        'id': vid_id,
                         'title': data_video.get('title', ''),
                         'creator': data_video.get('uploader', ''),
                         'views': data_video.get('view_count', 0),
@@ -77,9 +72,14 @@ def get_data_by_amount(tfrecords_amount=100):
                         'duration': data_video.get('duration', 0)
                     }
                 })
+                count += 1
+                if count % (data_amount / 10) == 0:
+                    print(f"[{type}] data preprocessing progress: {count / data_amount}%")
+                if count == data_amount:
+                    break
 
     # Save input_output data
-    with open('input_output_data.pkl', 'wb') as f:
+    with open(f'{type}_input_output_data_{count}.pkl', 'wb') as f:
         pickle.dump(input_output, f)
 
     print(f"Processed and saved {len(input_output)} samples")
@@ -87,7 +87,7 @@ def get_data_by_amount(tfrecords_amount=100):
 
 
 
-def load_and_prepare_data(pickle_file_path='input_output_data.pkl', max_title_length=20, max_frames=300):
+def load_and_prepare_data(pickle_file_path='train_input_output_data_100.pkl', max_title_length=20, max_frames=300):
     # Load the pickle file
     with open(pickle_file_path, 'rb') as f:
         data = pickle.load(f)

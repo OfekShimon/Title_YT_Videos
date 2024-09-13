@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Model
@@ -81,7 +82,7 @@ def train_model(X_rgb, X_audio, y, tokenizer, max_title_length, epochs=100, batc
     # Define callbacks
     callbacks = [
         EarlyStopping(patience=20, restore_best_weights=True),
-        ModelCheckpoint('best_model.keras', save_best_only=True),
+        ModelCheckpoint('best_model.tf', save_best_only=True, save_format="tf"),
         LambdaCallback(on_epoch_end=print_prediction)
     ]
 
@@ -126,9 +127,13 @@ def predict_and_analyze(model, X_rgb, X_audio, y, tokenizer):
 
 
 def main():
-    # Load and prepare data
-    get_data_by_amount(1)
-    X_rgb, X_audio, y, tokenizer = load_and_prepare_data()
+    # Load and prepare train data
+    data_amount = 100
+    train_data_path = f'train_input_output_data_{data_amount}.pkl'
+    if not os.path.exists(train_data_path):
+        print("preprocessing data...")
+        get_data_by_amount(data_amount, 'train')
+    X_rgb, X_audio, y, tokenizer = load_and_prepare_data(train_data_path)
 
     print("X_rgb shape:", X_rgb.shape)
     print("X_audio shape:", X_audio.shape)
