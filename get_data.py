@@ -9,7 +9,8 @@ import yt8m_downloader
 import yt8m_crawler
 import pickle
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
+import random
+import time
 
 def get_data_by_amount(data_amount=1000, type='train'):
     data_type = "frame"
@@ -29,10 +30,17 @@ def get_data_by_amount(data_amount=1000, type='train'):
         input_output = []
 
         for example in tf.data.TFRecordDataset(tfrecord_file):
+            sleep_time = random.randint(1, 5)
+            time.sleep(sleep_time)
+            print(f"fetching example {count}...")
             tf_example = tf.train.SequenceExample.FromString(example.numpy())
 
             yt8m_id = tf_example.context.feature['id'].bytes_list.value[0].decode(encoding='UTF-8')
-            vid_id = yt8m_crawler.get_real_id(yt8m_id)
+            try:
+                vid_id = yt8m_crawler.get_real_id(yt8m_id)
+            except Exception as e:
+                print(f"Error fetching video details for {yt8m_id}: {str(e)}")
+                continue
             labels = list(tf_example.context.feature['labels'].int64_list.value)  # Convert to list
             
             if vid_id is None:
