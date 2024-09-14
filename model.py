@@ -82,7 +82,7 @@ def train_model(X_rgb, X_audio, y, tokenizer, max_title_length, epochs=100, batc
     # Define callbacks
     callbacks = [
         EarlyStopping(patience=20, restore_best_weights=True),
-        ModelCheckpoint('best_model.tf', save_best_only=True, save_format="tf"),
+        ModelCheckpoint('best_model.keras', save_best_only=True),
         LambdaCallback(on_epoch_end=print_prediction)
     ]
 

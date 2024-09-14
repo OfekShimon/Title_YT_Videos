@@ -38,7 +38,7 @@ def fetch_video_details(video_id):
         'format': 'best'
     }
 
-    with  yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             video_info = ydl.extract_info(video_url, download=False)
         except yt_dlp.utils.DownloadError as e:
