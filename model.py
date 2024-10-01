@@ -7,7 +7,7 @@ from tensorflow.keras.layers import Input, LSTM, Dense, TimeDistributed, Concate
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LambdaCallback
 import matplotlib.pyplot as plt
-from get_data import load_and_prepare_data, get_data_by_amount
+from get_data_new import load_and_prepare_data, get_data_by_amount
 
 
 def create_model(max_frames, rgb_features, audio_features, vocab_size, max_title_length):
@@ -129,10 +129,10 @@ def predict_and_analyze(model, X_rgb, X_audio, y, tokenizer):
 def main():
     # Load and prepare train data
     data_amount = 10000
-    train_data_path = f'train_input_output_data_{data_amount}.pkl'
+    train_data_path = "merged_train_data.csv"
     if not os.path.exists(train_data_path):
         print("preprocessing data...")
-        get_data_by_amount(data_amount, 'train')
+        get_data_by_amount(data_amount, 'train', train_data_path)
     X_rgb, X_audio, y, tokenizer = load_and_prepare_data(train_data_path)
 
     print("X_rgb shape:", X_rgb.shape)

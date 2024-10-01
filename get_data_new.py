@@ -12,9 +12,10 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import random
 import time
 import csv
+import glob
 
-def get_data_by_amount(data_amount=1000, type='train'):
-
+# save csv files with movies data, max 1000 per file
+def get_data_by_amount(data_amount=1000, type='train', output_path= "merged_train_data.csv"):
     data_type = "frame"
     base_url = "http://eu.data.yt8m.org/2"
     download_dir = "data/yt8m"
@@ -107,34 +108,36 @@ def get_data_by_amount(data_amount=1000, type='train'):
                     file_index += 1
 
     print(f"Processed and saved {count} samples")
+    input_pattern = "train_input_output_data_*.csv"
+    merge_csv_files(input_pattern, output_path)
     return input_output
 
-
-def load_and_prepare_data(pickle_file_path='train_input_output_data_100.pkl', max_title_length=20, max_frames=300):
-    # Load the pickle file
-    with open(pickle_file_path, 'rb') as f:
-        data = pickle.load(f)
+#load data from patj
+def load_and_prepare_data(csv_file_path='train_input_output_data_1000.csv', max_title_length=20, max_frames=300):
+    # Load the CSV file
+    data = pd.read_csv(csv_file_path)
 
     # Prepare X (input features)
     X_rgb = []
     X_audio = []
     titles = []
 
-    for item in data:
-        rgb_frames = item['input']['rgb']
-        audio_frames = item['input']['audio']
+    for _, row in data.iterrows():
+        # Assuming the CSV has columns 'rgb', 'audio', and 'title'
+        rgb_frames = np.fromstring(row['rgb'][1:-1], sep=',').reshape(-1, 3)  # Adjust shape as needed
+        audio_frames = np.fromstring(row['audio'][1:-1], sep=',').reshape(-1, 1)  # Adjust shape as needed
 
         # Pad or truncate the frames
         if len(rgb_frames) > max_frames:
             rgb_frames = rgb_frames[:max_frames]
             audio_frames = audio_frames[:max_frames]
         else:
-            rgb_frames = rgb_frames + [np.zeros_like(rgb_frames[0])] * (max_frames - len(rgb_frames))
-            audio_frames = audio_frames + [np.zeros_like(audio_frames[0])] * (max_frames - len(audio_frames))
+            rgb_frames = np.pad(rgb_frames, ((0, max_frames - len(rgb_frames)), (0, 0)), mode='constant')
+            audio_frames = np.pad(audio_frames, ((0, max_frames - len(audio_frames)), (0, 0)), mode='constant')
 
         X_rgb.append(rgb_frames)
         X_audio.append(audio_frames)
-        titles.append(item['metadata']['title'])
+        titles.append(row['title'])
 
     # Convert lists to numpy arrays
     X_rgb = np.array(X_rgb)
@@ -159,18 +162,47 @@ def decode_title(encoded_title, tokenizer):
     return ' '.join([tokenizer.index_word.get(idx, '') for idx in encoded_title if idx != 0])
 
 
+def merge_csv_files(input_pattern, output_file):
+    # Get all CSV files matching the input pattern
+    all_files = glob.glob(input_pattern)
+
+    # Sort the files to ensure they are processed in order
+    all_files.sort()
+
+    # List to store individual dataframes
+    df_list = []
+
+    # Read each CSV file and append to the list
+    i = 0
+    for filename in all_files:
+        i+=1
+        print("i: ", i)
+        df = pd.read_csv(filename, index_col=None, header=0)
+        df_list.append(df)
+
+    # Concatenate all dataframes in the list
+    combined_df = pd.concat(df_list, axis=0, ignore_index=True)
+
+    # Write the combined dataframe to a new CSV file
+    combined_df.to_csv(output_file, index=False)
+
+    print(f"Merged {len(all_files)} files into {output_file}")
 def main():
 # Usage
-    data_amount = 10000
-    get_data_by_amount(data_amount, 'train')
-    X_rgb, X_audio, y, tokenizer = load_and_prepare_data()
+#     data_amount = 10000
+#     get_data_by_amount(data_amount, 'train')
+#     X_rgb, X_audio, y, tokenizer = load_and_prepare_data()
+#
+#     print("Shape of X_rgb:", X_rgb.shape)
+#     print("Shape of X_audio:", X_audio.shape)
+#     print("Shape of y:", y.shape)
+#     print("Vocabulary size:", len(tokenizer.word_index) + 1)
+#     print("\nExample decoded title:")
+#     print(decode_title(y[0], tokenizer))
 
-    print("Shape of X_rgb:", X_rgb.shape)
-    print("Shape of X_audio:", X_audio.shape)
-    print("Shape of y:", y.shape)
-    print("Vocabulary size:", len(tokenizer.word_index) + 1)
-    print("\nExample decoded title:")
-    print(decode_title(y[0], tokenizer))
+    input_pattern = "train_input_output_data_*.csv"
+    output_file = "merged_train_data.csv"
+    merge_csv_files(input_pattern, output_file)
 
 if __name__ == "__main__":
     main()
