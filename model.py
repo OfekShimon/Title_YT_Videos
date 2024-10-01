@@ -128,7 +128,7 @@ def predict_and_analyze(model, X_rgb, X_audio, y, tokenizer):
 
 def main():
     # Load and prepare train data
-    data_amount = 100
+    data_amount = 10000
     train_data_path = f'train_input_output_data_{data_amount}.pkl'
     if not os.path.exists(train_data_path):
         print("preprocessing data...")
