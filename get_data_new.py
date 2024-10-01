@@ -11,15 +11,18 @@ import pickle
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import random
 import time
+import csv
 
-def get_data_by_amount(data_amount=1000, type='train', file_name = "train_input_output_data.pkl"):
+def get_data_by_amount(data_amount=1000, type='train'):
 
     data_type = "frame"
     base_url = "http://eu.data.yt8m.org/2"
     download_dir = "data/yt8m"
     
     tfrecord_index = 0
+    input_output = []
     count = 0
+    file_index = 1
 
     # Loop through each TFRecord file
     while count < data_amount and tfrecord_index <= 3843: # 3843 is the last file
@@ -28,7 +31,6 @@ def get_data_by_amount(data_amount=1000, type='train', file_name = "train_input_
         tfrecord_index += 1
         print(f"[{type}] working on {tfrecord_file}")
 
-        input_output = []
 
         for example in tf.data.TFRecordDataset(tfrecord_file):
             sleep_time = random.randint(1, 5)
@@ -75,26 +77,37 @@ def get_data_by_amount(data_amount=1000, type='train', file_name = "train_input_
                     'metadata': {
                         'id': vid_id,
                         'title': data_video.get('title', ''),
-                        'creator': data_video.get('uploader', ''),
-                        'views': data_video.get('view_count', 0),
-                        'likes': data_video.get('like_count', 0),
                         'duration': data_video.get('duration', 0)
                     }
                 })
                 count += 1
                 if count % (data_amount / 10) == 0:
                     print(f"[{type}] data preprocessing progress: {count / data_amount}%")
-                if count == data_amount:
-                    break
+                if count % 1000 == 0 or count == data_amount:
+                    file_name = f'{type}_input_output_data_{count}.csv'
+                    with open(file_name, 'w', newline='') as csvfile:
+                        fieldnames = ['rgb', 'audio', 'labels', 'id', 'title', 'creator', 'views', 'likes',
+                                      'duration']
+                        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
-    # Save input_output data
-    # with open(f'{type}_input_output_data_{count}.pkl', 'wb') as f:
-    with open(file_name, 'wb') as f:
-        pickle.dump(input_output, f)
+                        writer.writeheader()
+                        for item in input_output:
+                            writer.writerow({
+                                'rgb': item['input']['rgb'],
+                                'creator': data_video.get('uploader', ''),
+                                'views': data_video.get('view_count', 0),
+                                'likes': data_video.get('like_count', 0),
+                                'audio': item['input']['audio'],
+                                'labels': item['output'],
+                                'id': item['metadata']['id'],
+                                'title': item['metadata']['title'],
+                                'duration': item['metadata']['duration']
+                            })
+                    input_output = []  # Reset the list for the next batch
+                    file_index += 1
 
-    print(f"Processed and saved {len(input_output)} samples")
+    print(f"Processed and saved {count} samples")
     return input_output
-
 
 
 def load_and_prepare_data(pickle_file_path='train_input_output_data_100.pkl', max_title_length=20, max_frames=300):
@@ -148,7 +161,8 @@ def decode_title(encoded_title, tokenizer):
 
 def main():
 # Usage
-
+    data_amount = 10000
+    get_data_by_amount(data_amount, 'train')
     X_rgb, X_audio, y, tokenizer = load_and_prepare_data()
 
     print("Shape of X_rgb:", X_rgb.shape)
@@ -157,3 +171,6 @@ def main():
     print("Vocabulary size:", len(tokenizer.word_index) + 1)
     print("\nExample decoded title:")
     print(decode_title(y[0], tokenizer))
+
+if __name__ == "__main__":
+    main()
