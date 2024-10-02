@@ -33,7 +33,7 @@ def get_data_by_amount(data_amount=1000, type='train', output_path="data/merged_
 
 
         for example in tf.data.TFRecordDataset(tfrecord_file):
-            sleep_time = random.uniform(0.1, 0.5) # random.randint(1, 5) # 
+            sleep_time = random.uniform(0.15, 0.55) # random.randint(1, 5) # 
             time.sleep(sleep_time)
 
             if count % 10 == 0 and first_print:
@@ -119,8 +119,9 @@ def get_data_by_amount(data_amount=1000, type='train', output_path="data/merged_
     merge_csv_files(input_pattern, output_path)
     return input_output
 
-#load data from patj
-def load_and_prepare_data(csv_file_path='train_input_output_data_1000.csv', max_title_length=20, max_frames=300):
+
+#load data from path
+def load_and_prepare_data(csv_file_path='data/train_input_output_data_1000.csv', max_title_length=20, max_frames=300):
     # Load the CSV file
     data = pd.read_csv(csv_file_path)
 
@@ -164,6 +165,7 @@ def load_and_prepare_data(csv_file_path='train_input_output_data_1000.csv', max_
 
     return X_rgb, X_audio, y, tokenizer
 
+
 # Example of how to get the original title from y
 def decode_title(encoded_title, tokenizer):
     return ' '.join([tokenizer.index_word.get(idx, '') for idx in encoded_title if idx != 0])
@@ -194,6 +196,8 @@ def merge_csv_files(input_pattern, output_file):
     combined_df.to_csv(output_file, index=False)
 
     print(f"Merged {len(all_files)} files into {output_file}")
+
+
 def main():
 # Usage
 #     data_amount = 10000
@@ -210,6 +214,7 @@ def main():
     input_pattern = "train_input_output_data_*.csv"
     output_file = "merged_train_data.csv"
     merge_csv_files(input_pattern, output_file)
+
 
 if __name__ == "__main__":
     main()
