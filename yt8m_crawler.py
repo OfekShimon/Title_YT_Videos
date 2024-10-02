@@ -34,8 +34,7 @@ def fetch_video_details(video_id):
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     ydl_opts = {
         'quiet': True,
-        'no_warnings': True,
-        'format': 'best'
+        'no_warnings': True
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
