@@ -1,4 +1,5 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Model
@@ -7,7 +8,8 @@ from tensorflow.keras.layers import Input, LSTM, Dense, TimeDistributed, Concate
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LambdaCallback
 import matplotlib.pyplot as plt
-from get_data_new import load_and_prepare_data, get_data_by_amount
+from get_data import load_and_prepare_data, get_data_by_amount
+import enchant
 
 
 def create_model(max_frames, rgb_features, audio_features, vocab_size, max_title_length):
@@ -126,13 +128,27 @@ def predict_and_analyze(model, X_rgb, X_audio, y, tokenizer):
     plt.show()
 
 
+def is_english(text):
+    text = text.split()
+    dictionary = enchant.Dict("en_US")
+    count_true = 0
+    count_false = 0
+    for i in range(len(text)):
+        if dictionary.check(text[i]):
+            count_true += 1
+        else:
+            count_false += 1
+    return count_true >= 3 or count_false == 0
+
+
 def main():
     # Load and prepare train data
     data_amount = 10000
     train_data_path = "merged_train_data.csv"
     if not os.path.exists(train_data_path):
         print("preprocessing data...")
-        get_data_by_amount(data_amount, 'train', train_data_path)
+        data_filter = lambda data_video: is_english(data_video.get('title', '')) and data_video.get('view_count', 0) > 100
+        get_data_by_amount(data_amount, 'train', train_data_path, data_filter)
     X_rgb, X_audio, y, tokenizer = load_and_prepare_data(train_data_path)
 
     print("X_rgb shape:", X_rgb.shape)
