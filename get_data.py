@@ -1,25 +1,28 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import numpy as np
 import pandas as pd
-import os
-import sys
 import tensorflow as tf
 import yt8m_downloader
 import yt8m_crawler
-import pickle
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import random
 import time
+import csv
+import glob
 
-def get_data_by_amount(data_amount=1000, type='train', file_name = "train_input_output_data.pkl"):
-
+# save csv files with movies data, max 1000 per file
+def get_data_by_amount(data_amount=1000, type='train', output_path="data/merged_train_data.csv", metadata_filter=None, genres=None):
     data_type = "frame"
     base_url = "http://eu.data.yt8m.org/2"
     download_dir = "data/yt8m"
     
     tfrecord_index = 0
+    input_output = []
     count = 0
+    file_index = 1
+    first_print = True
 
     # Loop through each TFRecord file
     while count < data_amount and tfrecord_index <= 3843: # 3843 is the last file
@@ -28,13 +31,19 @@ def get_data_by_amount(data_amount=1000, type='train', file_name = "train_input_
         tfrecord_index += 1
         print(f"[{type}] working on {tfrecord_file}")
 
-        input_output = []
 
         for example in tf.data.TFRecordDataset(tfrecord_file):
-            sleep_time = random.randint(1, 5)
+            sleep_time = random.uniform(0.1, 0.5) # random.randint(1, 5) # 
             time.sleep(sleep_time)
-            print(f"fetching example {count}...")
+
+            if count % 10 == 0 and first_print:
+                print(f"fetching examples {count}-{min(count + 10, data_amount)}...")
+                first_print = False
             tf_example = tf.train.SequenceExample.FromString(example.numpy())
+            
+            labels = set(tf_example.context.feature['labels'].int64_list.value)  # Convert to list
+            if genres is not None and len(labels.intersection(genres)) == 0:
+                continue
 
             yt8m_id = tf_example.context.feature['id'].bytes_list.value[0].decode(encoding='UTF-8')
             try:
@@ -42,7 +51,6 @@ def get_data_by_amount(data_amount=1000, type='train', file_name = "train_input_
             except Exception as e:
                 print(f"Error fetching video details for {yt8m_id}: {str(e)}")
                 continue
-            labels = list(tf_example.context.feature['labels'].int64_list.value)  # Convert to list
             
             if vid_id is None:
                 print(f'Error fetching video details: unable to get the real id of {yt8m_id}')
@@ -62,10 +70,11 @@ def get_data_by_amount(data_amount=1000, type='train', file_name = "train_input_
             try:
                 data_video = yt8m_crawler.fetch_video_details(vid_id)
             except Exception as e:
-                print(f"Error fetching video details for {vid_id}: {str(e)}")
+                # print(f"Error fetching video details for {vid_id}: {str(e)}")
                 continue
 
-            if data_video:
+            if data_video and (metadata_filter is None or metadata_filter(data_video)):
+                # print(f'title: {data_video.get('title', '')}, views: {data_video.get('view_count', 0)}')
                 input_output.append({
                     'input': {
                         'rgb': rgb_frames,
@@ -75,53 +84,67 @@ def get_data_by_amount(data_amount=1000, type='train', file_name = "train_input_
                     'metadata': {
                         'id': vid_id,
                         'title': data_video.get('title', ''),
-                        'creator': data_video.get('uploader', ''),
-                        'views': data_video.get('view_count', 0),
-                        'likes': data_video.get('like_count', 0),
                         'duration': data_video.get('duration', 0)
                     }
                 })
+                first_print = True
                 count += 1
                 if count % (data_amount / 10) == 0:
-                    print(f"[{type}] data preprocessing progress: {count / data_amount}%")
-                if count == data_amount:
-                    break
+                    print(f"[{type}] data preprocessing progress: {(count / data_amount) * 100}%")
+                if count % 1000 == 0 or count == data_amount:
+                    file_name = f'data/{type}_input_output_data_{count}.csv'
+                    with open(file_name, 'w', newline='', encoding="utf-8") as csvfile:
+                        fieldnames = ['rgb', 'audio', 'labels', 'id', 'title', 'creator', 'views', 'likes',
+                                      'duration']
+                        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
-    # Save input_output data
-    # with open(f'{type}_input_output_data_{count}.pkl', 'wb') as f:
-    with open(file_name, 'wb') as f:
-        pickle.dump(input_output, f)
+                        writer.writeheader()
+                        for item in input_output:
+                            writer.writerow({
+                                'rgb': item['input']['rgb'],
+                                'creator': data_video.get('uploader', ''),
+                                'views': data_video.get('view_count', 0),
+                                'likes': data_video.get('like_count', 0),
+                                'audio': item['input']['audio'],
+                                'labels': item['output'],
+                                'id': item['metadata']['id'],
+                                'title': item['metadata']['title'],
+                                'duration': item['metadata']['duration']
+                            })
+                    input_output = []  # Reset the list for the next batch
+                    file_index += 1
 
-    print(f"Processed and saved {len(input_output)} samples")
+    print(f"Processed and saved {count} samples")
+    input_pattern = "train_input_output_data_*.csv"
+    merge_csv_files(input_pattern, output_path)
     return input_output
 
-
-
-def load_and_prepare_data(pickle_file_path='train_input_output_data_100.pkl', max_title_length=20, max_frames=300):
-    # Load the pickle file
-    with open(pickle_file_path, 'rb') as f:
-        data = pickle.load(f)
+#load data from patj
+def load_and_prepare_data(csv_file_path='train_input_output_data_1000.csv', max_title_length=20, max_frames=300):
+    # Load the CSV file
+    data = pd.read_csv(csv_file_path)
 
     # Prepare X (input features)
     X_rgb = []
     X_audio = []
     titles = []
 
-    for item in data:
-        rgb_frames = item['input']['rgb']
-        audio_frames = item['input']['audio']
+    for _, row in data.iterrows():
+        # Assuming the CSV has columns 'rgb', 'audio', and 'title'
+        rgb_frames = np.fromstring(row['rgb'][1:-1], sep=',').reshape(-1, 3)  # Adjust shape as needed
+        audio_frames = np.fromstring(row['audio'][1:-1], sep=',').reshape(-1, 1)  # Adjust shape as needed
 
         # Pad or truncate the frames
         if len(rgb_frames) > max_frames:
             rgb_frames = rgb_frames[:max_frames]
             audio_frames = audio_frames[:max_frames]
         else:
-            rgb_frames = rgb_frames + [np.zeros_like(rgb_frames[0])] * (max_frames - len(rgb_frames))
-            audio_frames = audio_frames + [np.zeros_like(audio_frames[0])] * (max_frames - len(audio_frames))
+            rgb_frames = np.pad(rgb_frames, ((0, max_frames - len(rgb_frames)), (0, 0)), mode='constant')
+            audio_frames = np.pad(audio_frames, ((0, max_frames - len(audio_frames)), (0, 0)), mode='constant')
 
         X_rgb.append(rgb_frames)
         X_audio.append(audio_frames)
-        titles.append(item['metadata']['title'])
+        titles.append(row['title'])
 
     # Convert lists to numpy arrays
     X_rgb = np.array(X_rgb)
@@ -146,14 +169,47 @@ def decode_title(encoded_title, tokenizer):
     return ' '.join([tokenizer.index_word.get(idx, '') for idx in encoded_title if idx != 0])
 
 
+def merge_csv_files(input_pattern, output_file):
+    # Get all CSV files matching the input pattern
+    all_files = glob.glob(input_pattern)
+
+    # Sort the files to ensure they are processed in order
+    all_files.sort()
+
+    # List to store individual dataframes
+    df_list = []
+
+    # Read each CSV file and append to the list
+    i = 0
+    for filename in all_files:
+        i+=1
+        print("i: ", i)
+        df = pd.read_csv(filename, index_col=None, header=0)
+        df_list.append(df)
+
+    # Concatenate all dataframes in the list
+    combined_df = pd.concat(df_list, axis=0, ignore_index=True)
+
+    # Write the combined dataframe to a new CSV file
+    combined_df.to_csv(output_file, index=False)
+
+    print(f"Merged {len(all_files)} files into {output_file}")
 def main():
 # Usage
+#     data_amount = 10000
+#     get_data_by_amount(data_amount, 'train')
+#     X_rgb, X_audio, y, tokenizer = load_and_prepare_data()
+#
+#     print("Shape of X_rgb:", X_rgb.shape)
+#     print("Shape of X_audio:", X_audio.shape)
+#     print("Shape of y:", y.shape)
+#     print("Vocabulary size:", len(tokenizer.word_index) + 1)
+#     print("\nExample decoded title:")
+#     print(decode_title(y[0], tokenizer))
 
-    X_rgb, X_audio, y, tokenizer = load_and_prepare_data()
+    input_pattern = "train_input_output_data_*.csv"
+    output_file = "merged_train_data.csv"
+    merge_csv_files(input_pattern, output_file)
 
-    print("Shape of X_rgb:", X_rgb.shape)
-    print("Shape of X_audio:", X_audio.shape)
-    print("Shape of y:", y.shape)
-    print("Vocabulary size:", len(tokenizer.word_index) + 1)
-    print("\nExample decoded title:")
-    print(decode_title(y[0], tokenizer))
+if __name__ == "__main__":
+    main()
