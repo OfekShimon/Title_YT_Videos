@@ -33,7 +33,7 @@ def get_data_by_amount(data_amount=1000, type='train', output_path="data/merged_
 
 
         for example in tf.data.TFRecordDataset(tfrecord_file):
-            sleep_time = random.uniform(0.5, 1.5) # random.randint(1, 5) # 
+            sleep_time = random.uniform(1.0, 2.0) # random.randint(1, 5) # 
             time.sleep(sleep_time)
 
             if count % 10 == 0 and first_print:
