@@ -10,7 +10,7 @@ from tqdm import tqdm
 import time
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from get_data_new import load_and_prepare_data, get_data_by_amount
+from get_data import load_and_prepare_data, get_data_by_amount
 
 
 class VideoTitleGenerator(nn.Module):

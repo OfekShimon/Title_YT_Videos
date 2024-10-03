@@ -33,8 +33,8 @@ def get_data_by_amount(data_amount=1000, type='train', output_path="data/merged_
 
 
         for example in tf.data.TFRecordDataset(tfrecord_file):
-            sleep_time = random.uniform(1.0, 2.0) # random.randint(1, 5) # 
-            #time.sleep(sleep_time)
+            sleep_time = random.uniform(1.0, 2.0) # random.randint(1, 5) #
+            time.sleep(sleep_time)
 
             if count % 10 == 0 and first_print:
                 print(f"fetching examples {count}-{min(count + 10, data_amount)}...")
@@ -84,7 +84,7 @@ def get_data_by_amount(data_amount=1000, type='train', output_path="data/merged_
                     'metadata': {
                         'id': vid_id,
                         'title': data_video.get('title', ''),
-                        #'duration': data_video.get('duration', 0)
+                        'duration': data_video.get('duration', 0)
                     }
                 })
                 first_print = True
@@ -102,17 +102,20 @@ def get_data_by_amount(data_amount=1000, type='train', output_path="data/merged_
                         for item in input_output:
                             writer.writerow({
                                 'rgb': item['input']['rgb'],
-                                #'creator': data_video.get('uploader', ''),
+                                'creator': data_video.get('uploader', ''),
                                 'views': data_video.get('view_count', 0),
-                                #'likes': data_video.get('like_count', 0),
+                                'likes': data_video.get('like_count', 0),
                                 'audio': item['input']['audio'],
                                 'labels': item['output'],
                                 'id': item['metadata']['id'],
                                 'title': item['metadata']['title'],
-                                #'duration': item['metadata']['duration']
+                                'duration': item['metadata']['duration']
                             })
                     input_output = []  # Reset the list for the next batch
                     file_index += 1
+                if count == data_amount:
+                    break
+
 
     print(f"Processed and saved {count} samples")
     input_pattern = "train_input_output_data_*.csv"

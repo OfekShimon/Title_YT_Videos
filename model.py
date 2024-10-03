@@ -8,7 +8,16 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LambdaCallback
 import matplotlib.pyplot as plt
 from get_data import load_and_prepare_data, get_data_by_amount
-import enchant
+# import enchant
+import nltk
+nltk.download('words')
+from nltk.corpus import words
+
+def is_english(text):
+    english_words = set(words.words())
+    text_words = set(text.lower().split())
+    count_true = len(text_words.intersection(english_words))
+    return count_true >= 3 or count_true == len(text_words)
 
 
 def create_model(max_frames, rgb_features, audio_features, vocab_size, max_title_length, embedding_dim=256):
@@ -146,17 +155,17 @@ def predict_and_analyze(model, X_rgb, X_audio, y, tokenizer, max_title_length):
     plt.show()
 
 
-def is_english(text):
-    text = text.split()
-    dictionary = enchant.Dict("en_US")
-    count_true = 0
-    count_false = 0
-    for i in range(len(text)):
-        if dictionary.check(text[i]):
-            count_true += 1
-        else:
-            count_false += 1
-    return count_true >= 4 or count_false == 0
+# def is_english(text):
+#     text = text.split()
+#     dictionary = enchant.Dict("en_US")
+#     count_true = 0
+#     count_false = 0
+#     for i in range(len(text)):
+#         if dictionary.check(text[i]):
+#             count_true += 1
+#         else:
+#             count_false += 1
+#     return count_true >= 3 or count_false == 0
 
 
 def main():
