@@ -156,7 +156,7 @@ def is_english(text):
             count_true += 1
         else:
             count_false += 1
-    return count_true >= 3 or count_false == 0
+    return count_true >= 4 or count_false == 0
 
 
 def main():
