@@ -11,7 +11,7 @@ import time
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from get_data import load_and_prepare_data, get_data_by_amount
-
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 class VideoTitleGenerator(nn.Module):
     def __init__(self, rgb_features, audio_features, vocab_size, max_title_length, embedding_dim=256, hidden_size=512):
@@ -59,7 +59,6 @@ class VideoTitleGenerator(nn.Module):
 
         return output
 
-
 def create_model(max_frames, rgb_features, audio_features, vocab_size, max_title_length, embedding_dim=256):
     model = VideoTitleGenerator(rgb_features, audio_features, vocab_size, max_title_length, embedding_dim)
 
@@ -72,17 +71,25 @@ def create_model(max_frames, rgb_features, audio_features, vocab_size, max_title
 
     return model
 
-
 def save_model(model, path):
     torch.save(model.state_dict(), path)
     print(f"Model saved to {path}")
-
 
 def load_model(model_path, max_frames, rgb_features, audio_features, vocab_size, max_title_length):
     model = create_model(max_frames, rgb_features, audio_features, vocab_size, max_title_length)
     model.load_state_dict(torch.load(model_path))
     return model
 
+def calculate_bleu(predicted, actual, tokenizer):
+    smooth = SmoothingFunction().method1
+    predicted_sentence = [tokenizer.index_word.get(idx.item(), '') for idx in predicted if idx.item() != 0]
+    actual_sentence = [tokenizer.index_word.get(idx.item(), '') for idx in actual if idx.item() != 0]
+    return sentence_bleu([actual_sentence], predicted_sentence, smoothing_function=smooth)
+
+def calculate_accuracy(predictions, targets, ignore_index=0):
+    non_ignored = targets != ignore_index
+    correct = (predictions == targets) & non_ignored
+    return correct.sum().float() / non_ignored.sum().float()
 
 def train_model(X_rgb, X_audio, y, tokenizer, max_title_length, epochs=100, batch_size=64):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -104,7 +111,7 @@ def train_model(X_rgb, X_audio, y, tokenizer, max_title_length, epochs=100, batc
     dataset = TensorDataset(X_rgb_tensor, X_audio_tensor, y_tensor)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4)
 
-    history = {'loss': [], 'val_loss': [], 'accuracy': [], 'val_accuracy': []}
+    history = {'loss': [], 'val_loss': [], 'accuracy': [], 'val_accuracy': [], 'bleu': [], 'val_bleu': []}
 
     for epoch in range(epochs):
         model.train()
@@ -112,8 +119,8 @@ def train_model(X_rgb, X_audio, y, tokenizer, max_title_length, epochs=100, batc
 
         progress_bar = tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch {epoch + 1}/{epochs}")
         total_loss = 0
-        correct_predictions = 0
-        total_predictions = 0
+        total_accuracy = 0
+        total_bleu = 0
 
         for batch_idx, (batch_rgb, batch_audio, batch_y) in progress_bar:
             optimizer.zero_grad()
@@ -148,42 +155,63 @@ def train_model(X_rgb, X_audio, y, tokenizer, max_title_length, epochs=100, batc
                 return model, history
 
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)  # Gradient clipping
+            clip_grad_norm_(model.parameters(), max_norm=1)  # Gradient clipping
             optimizer.step()
 
             total_loss += loss.item()
 
             # Calculate accuracy
             predictions = outputs.argmax(dim=-1)
-            correct_predictions += (predictions == batch_y[:, 1:]).sum().item()
-            total_predictions += batch_y[:, 1:].ne(0).sum().item()
+            accuracy = calculate_accuracy(predictions, batch_y[:, 1:])
+            total_accuracy += accuracy.item()
+
+            # Calculate BLEU score
+            batch_bleu = 0
+            for i in range(predictions.size(0)):
+                batch_bleu += calculate_bleu(predictions[i], batch_y[i, 1:], tokenizer)
+            total_bleu += batch_bleu / predictions.size(0)
 
             # Update progress bar
             current_loss = total_loss / (batch_idx + 1)
-            current_accuracy = correct_predictions / total_predictions
+            current_accuracy = total_accuracy / (batch_idx + 1)
+            current_bleu = total_bleu / (batch_idx + 1)
             progress_bar.set_postfix({
                 'batch': f'{batch_idx + 1}/{len(dataloader)}',
                 'loss': f'{current_loss:.4f}',
                 'accuracy': f'{current_accuracy:.4f}',
+                'BLEU': f'{current_bleu:.4f}',
             })
 
         epoch_loss = total_loss / len(dataloader)
-        epoch_accuracy = correct_predictions / total_predictions
+        epoch_accuracy = total_accuracy / len(dataloader)
+        epoch_bleu = total_bleu / len(dataloader)
         epoch_time = time.time() - epoch_start_time
 
         history['loss'].append(epoch_loss)
         history['accuracy'].append(epoch_accuracy)
+        history['bleu'].append(epoch_bleu)
 
         print(f"\nEpoch {epoch + 1}/{epochs}")
         print(f"Time: {epoch_time:.2f}s")
-        print(f"Loss: {epoch_loss:.4f} (range: 0 - inf, lower is better)")
-        print(f"Accuracy: {epoch_accuracy:.4f} (range: 0 - 1, higher is better)")
+        print(f"Loss: {epoch_loss:.4f}")
+        print(f"Accuracy: {epoch_accuracy:.4f}")
+        print(f"BLEU: {epoch_bleu:.4f}")
         print(f"Learning rate: {optimizer.param_groups[0]['lr']:.6f}")
 
-        scheduler.step(epoch_loss)
+        # Validation
+        val_loss, val_accuracy, val_bleu = evaluate_model(model, X_rgb_tensor, X_audio_tensor, y_tensor, tokenizer, criterion, batch_size)
+        history['val_loss'].append(val_loss)
+        history['val_accuracy'].append(val_accuracy)
+        history['val_bleu'].append(val_bleu)
+
+        print(f"Validation Loss: {val_loss:.4f}")
+        print(f"Validation Accuracy: {val_accuracy:.4f}")
+        print(f"Validation BLEU: {val_bleu:.4f}")
+
+        scheduler.step(val_loss)
 
         # Save best model
-        if epoch == 0 or epoch_loss < min(history['loss'][:-1]):
+        if epoch == 0 or val_loss < min(history['val_loss'][:-1]):
             save_model(model, 'models/best_model.pth')
 
         # Print prediction examples
@@ -194,6 +222,42 @@ def train_model(X_rgb, X_audio, y, tokenizer, max_title_length, epochs=100, batc
     save_model(model, 'models/final_model.pth')
 
     return model, history
+
+def evaluate_model(model, X_rgb, X_audio, y, tokenizer, criterion, batch_size):
+    model.eval()
+    device = next(model.parameters()).device
+    total_loss = 0
+    total_accuracy = 0
+    total_bleu = 0
+    n_batches = 0
+
+    with torch.no_grad():
+        for i in range(0, len(X_rgb), batch_size):
+            batch_rgb = X_rgb[i:i + batch_size]
+            batch_audio = X_audio[i:i + batch_size]
+            batch_y = y[i:i + batch_size]
+
+            decoder_input = torch.zeros_like(batch_y)
+            decoder_input[:, 0] = tokenizer.word_index['<start>']
+
+            outputs = model(batch_rgb, batch_audio, decoder_input)
+            loss = criterion(outputs.view(-1, outputs.size(-1)), batch_y[:, 1:].reshape(-1))
+
+            total_loss += loss.item()
+
+            predictions = outputs.argmax(dim=-1)
+            accuracy = calculate_accuracy(predictions, batch_y[:, 1:])
+            total_accuracy += accuracy.item()
+
+            batch_bleu = 0
+            for j in range(predictions.size(0)):
+                batch_bleu += calculate_bleu(predictions[j], batch_y[j, 1:], tokenizer)
+            total_bleu += batch_bleu / predictions.size(0)
+
+            n_batches += 1
+
+    return total_loss / n_batches, total_accuracy / n_batches, total_bleu / n_batches
+
 def print_predictions(model, X_rgb, X_audio, y, tokenizer, max_title_length):
     model.eval()
     with torch.no_grad():
@@ -217,30 +281,34 @@ def print_predictions(model, X_rgb, X_audio, y, tokenizer, max_title_length):
             print(f"Predicted: {predicted_title}")
             print(f"Actual: {actual_title}\n")
 
-
 def plot_training_history(history):
-    plt.figure(figsize=(12, 4))
-    plt.subplot(121)
+    plt.figure(figsize=(15, 5))
+    plt.subplot(131)
     plt.plot(history['accuracy'], label='Train Accuracy')
-    if 'val_accuracy' in history:
-        plt.plot(history['val_accuracy'], label='Validation Accuracy')
+    plt.plot(history['val_accuracy'], label='Validation Accuracy')
     plt.title('Model Accuracy')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.legend()
 
-    plt.subplot(122)
+    plt.subplot(132)
     plt.plot(history['loss'], label='Train Loss')
-    if 'val_loss' in history:
-        plt.plot(history['val_loss'], label='Validation Loss')
+    plt.plot(history['val_loss'], label='Validation Loss')
     plt.title('Model Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
 
+    plt.subplot(133)
+    plt.plot(history['bleu'], label='Train BLEU')
+    plt.plot(history['val_bleu'], label='Validation BLEU')
+    plt.title('BLEU Score')
+    plt.xlabel('Epoch')
+    plt.ylabel('BLEU')
+    plt.legend()
+
     plt.tight_layout()
     plt.show()
-
 
 def predict_and_analyze(model, X_rgb, X_audio, y, tokenizer, max_title_length):
     model.eval()
@@ -270,6 +338,9 @@ def predict_and_analyze(model, X_rgb, X_audio, y, tokenizer, max_title_length):
         print("Predicted title:", predicted_title)
         print("Actual title:", actual_title)
 
+        bleu = calculate_bleu(decoder_input[0], y[0], tokenizer)
+        print(f"BLEU score: {bleu:.4f}")
+
         # Analyze prediction distribution
         plt.figure(figsize=(10, 5))
         plt.imshow(output[0].cpu().numpy().T, aspect='auto', cmap='viridis')
@@ -279,7 +350,6 @@ def predict_and_analyze(model, X_rgb, X_audio, y, tokenizer, max_title_length):
         plt.ylabel('Vocabulary Index')
         plt.tight_layout()
         plt.show()
-
 
 def main():
     # Define hyperparameters
@@ -344,37 +414,11 @@ def main():
 
     # Evaluate the model on the entire validation set
     print("\nEvaluating model on validation set...")
-    model.eval()
-    device = next(model.parameters()).device
     criterion = nn.CrossEntropyLoss(ignore_index=0)
-
-    with torch.no_grad():
-        val_loss = 0
-        val_correct_predictions = 0
-        val_total_predictions = 0
-
-        for i in range(0, len(X_rgb_val), batch_size):
-            batch_rgb = X_rgb_val[i:i + batch_size].to(device)
-            batch_audio = X_audio_val[i:i + batch_size].to(device)
-            batch_y = y_val[i:i + batch_size].to(device)
-
-            decoder_input = torch.zeros_like(batch_y)
-            decoder_input[:, 0] = tokenizer.word_index['<start>']
-
-            outputs = model(batch_rgb, batch_audio, decoder_input)
-            loss = criterion(outputs.view(-1, outputs.size(-1)), batch_y[:, 1:].reshape(-1))
-
-            val_loss += loss.item()
-
-            predictions = outputs.argmax(dim=-1)
-            val_correct_predictions += (predictions == batch_y[:, 1:]).sum().item()
-            val_total_predictions += batch_y[:, 1:].ne(0).sum().item()
-
-        val_loss /= (len(X_rgb_val) // batch_size)
-        val_accuracy = val_correct_predictions / val_total_predictions
-
-        print(f"Validation Loss: {val_loss:.4f}")
-        print(f"Validation Accuracy: {val_accuracy:.4f}")
+    val_loss, val_accuracy, val_bleu = evaluate_model(model, X_rgb_val, X_audio_val, y_val, tokenizer, criterion, batch_size)
+    print(f"Validation Loss: {val_loss:.4f}")
+    print(f"Validation Accuracy: {val_accuracy:.4f}")
+    print(f"Validation BLEU: {val_bleu:.4f}")
 
     # Save the tokenizer
     import pickle
@@ -383,7 +427,6 @@ def main():
     print("Tokenizer saved to models/tokenizer.pkl")
 
     print("\nTraining and evaluation complete!")
-
 
 if __name__ == "__main__":
     main()

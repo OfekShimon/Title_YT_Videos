@@ -33,7 +33,7 @@ def get_data_by_amount(data_amount=1000, type='train', output_path="data/merged_
 
 
         for example in tf.data.TFRecordDataset(tfrecord_file):
-            sleep_time = random.uniform(1.0, 2.0) # random.randint(1, 5) #
+            sleep_time = random.uniform(0.1, 3)
             time.sleep(sleep_time)
 
             if count % 10 == 0 and first_print:
@@ -118,7 +118,7 @@ def get_data_by_amount(data_amount=1000, type='train', output_path="data/merged_
 
 
     print(f"Processed and saved {count} samples")
-    input_pattern = "train_input_output_data_*.csv"
+    input_pattern = "data/train_input_output_data_*.csv"
     merge_csv_files(input_pattern, output_path)
     return input_output
 
@@ -214,7 +214,7 @@ def main():
 #     print("\nExample decoded title:")
 #     print(decode_title(y[0], tokenizer))
 
-    input_pattern = "train_input_output_data_*.csv"
+    input_pattern = "data/train_input_output_data_*.csv"
     output_file = "merged_train_data.csv"
     merge_csv_files(input_pattern, output_file)
 
