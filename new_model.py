@@ -7,7 +7,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import SparseCategoricalCrossentropy
 from tensorflow.keras.metrics import SparseCategoricalAccuracy
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LambdaCallback, ReduceLROnPlateau
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LambdaCallback
 import matplotlib.pyplot as plt
 from get_data import load_and_prepare_data, get_data_by_amount
 import nltk
@@ -103,25 +103,46 @@ def create_masks(inp, tar):
     combined_mask = tf.maximum(dec_target_padding_mask, look_ahead_mask)
     return enc_padding_mask, combined_mask, dec_padding_mask
 
-
-
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
-    def __init__(self, d_model, warmup_steps=4000):
+    def __init__(self, d_model, warmup_steps=4000, factor=0.2, patience=5, min_lr=1e-6):
         super(CustomSchedule, self).__init__()
         self.d_model = d_model
         self.warmup_steps = warmup_steps
+        self.factor = factor
+        self.patience = patience
+        self.min_lr = min_lr
+        self.best_val_loss = float('inf')
+        self.wait = 0
+        self.reduced_lr = 1.0
 
     def __call__(self, step):
         step = tf.cast(step, tf.float32)
         arg1 = tf.math.rsqrt(step)
         arg2 = step * (self.warmup_steps ** -1.5)
-        return tf.math.rsqrt(tf.cast(self.d_model, tf.float32)) * tf.math.minimum(arg1, arg2)
+        lr = tf.math.rsqrt(tf.cast(self.d_model, tf.float32)) * tf.math.minimum(arg1, arg2)
+        return tf.maximum(lr * self.reduced_lr, self.min_lr)
+
+    def on_epoch_end(self, epoch, logs=None):
+        current_val_loss = logs.get('val_loss')
+        if current_val_loss < self.best_val_loss:
+            self.best_val_loss = current_val_loss
+            self.wait = 0
+        else:
+            self.wait += 1
+            if self.wait >= self.patience:
+                self.reduced_lr *= self.factor
+                self.wait = 0
+                print(f"\nReducing learning rate to {self.reduced_lr:.6f}")
 
     def get_config(self):
         return {
             "d_model": self.d_model,
-            "warmup_steps": self.warmup_steps
+            "warmup_steps": self.warmup_steps,
+            "factor": self.factor,
+            "patience": self.patience,
+            "min_lr": self.min_lr
         }
+
 def calculate_bleu(y_true, y_pred, tokenizer):
     smooth = SmoothingFunction().method1
     bleu_scores = []
@@ -147,6 +168,13 @@ class BLEUCallback(tf.keras.callbacks.Callback):
         logs['bleu_score'] = bleu
         print(f' - BLEU score: {bleu:.4f}')
 
+class LearningRateSchedulerCallback(tf.keras.callbacks.Callback):
+    def __init__(self, schedule):
+        super(LearningRateSchedulerCallback, self).__init__()
+        self.schedule = schedule
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.schedule.on_epoch_end(epoch, logs)
 
 def create_improved_model(max_frames, rgb_features, audio_features, vocab_size, max_title_length, d_model=512,
                           num_layers=6, num_heads=8, dff=2048, dropout_rate=0.1):
@@ -201,7 +229,7 @@ def train_improved_model(X_rgb, X_audio, y, tokenizer, max_title_length, epochs=
 
     model = create_improved_model(max_frames, rgb_features, audio_features, vocab_size, max_title_length)
 
-    learning_rate = CustomSchedule(512)
+    learning_rate = CustomSchedule(512, factor=0.2, patience=5, min_lr=1e-6)
     optimizer = Adam(learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 
     loss_object = SparseCategoricalCrossentropy(from_logits=False, reduction='none')
@@ -256,7 +284,7 @@ def train_improved_model(X_rgb, X_audio, y, tokenizer, max_title_length, epochs=
         ModelCheckpoint('best_model.keras', save_best_only=True, monitor='val_loss', mode='min'),
         bleu_callback,
         LambdaCallback(on_epoch_end=print_prediction),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=1e-6),
+        LearningRateSchedulerCallback(learning_rate),
         EarlyStopping(patience=15, restore_best_weights=True)
     ]
 
