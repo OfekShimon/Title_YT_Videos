@@ -166,3 +166,5 @@ data/
 *.tf
 *.pkl
 test/
+models/
+YT-titles-transcripts-clean.csv
