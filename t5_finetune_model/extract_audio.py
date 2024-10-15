@@ -17,12 +17,12 @@ def extract_youtube_audio(link, data_folder):
         'outtmpl': data_folder + '%(title)s.wav'
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(link, download=True)
-        video_title = info_dict['title']
+        # info_dict = ydl.extract_info(link, download=True)
+        # video_title = info_dict['title']
         ydl.download(link)
     print("finished downloading")
 
-    audio_path = data_folder + video_title + '.wav'  # file name of your downloaded audio
+    audio_path = data_folder + 'audio.wav'  # file name of your downloaded audio
     print("audio saved to: ", audio_path)
 
     return audio_path
