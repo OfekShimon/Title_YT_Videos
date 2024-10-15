@@ -14,7 +14,7 @@ def extract_youtube_audio(link, data_folder):
     ydl_opts = {
         'extract_audio': True,
         'format': 'bestaudio',
-        'outtmpl': data_folder + '%(title)s.wav'
+        'outtmpl': data_folder + 'audio.wav'
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         # info_dict = ydl.extract_info(link, download=True)
