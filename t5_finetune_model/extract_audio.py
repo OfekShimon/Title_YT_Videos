@@ -1,3 +1,4 @@
+import os
 import ffmpeg
 import yt_dlp
 
@@ -11,6 +12,10 @@ def extract_audio(video, output_path):
 
 def extract_youtube_audio(link, data_folder):
     print("downloading audio...")
+    try:
+        os.remove(data_folder + 'audio.wav')
+    except OSError as e:
+        print("Error: %s - %s." % (e.filename, e.strerror))
     ydl_opts = {
         'extract_audio': True,
         'format': 'bestaudio',
