@@ -5,14 +5,16 @@ from tkinter import filedialog
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from extract_audio import extract_youtube_audio, extract_audio
 from extract_transcription import transcribe
+import pandas as pd
 import torch
 import threading
 import os
+import time
 
 class Application(ttk.Frame):
     def __init__(self, master=None):
         master.title("YouTube Video Title Generator")
-        master.geometry("800x600")
+        master.geometry("800x800")
 
         style = ttk.Style()
         style.configure('TButton', font=("Helvetica", 12))
@@ -75,6 +77,15 @@ class Application(ttk.Frame):
         self.generate_button = ttk.Button(self, text="Generate title", command=self.generate_title)
         self.generate_button.pack(side="top", padx=10, pady=10)
 
+        self.randomize_frame = ttk.Frame(self)
+        self.randomize_frame.pack(side="top", padx=10, pady=10)
+
+        self.randomize_button = ttk.Button(self.randomize_frame, text="Run model on 5 random videos", command=self.run_on_random_videos)
+        self.randomize_button.pack(side="left", padx=10)
+
+        self.refresh_button = ttk.Button(self.randomize_frame, text="Refresh", command=self.refresh_random_videos)
+        self.refresh_button.pack(side="left", padx=10)
+
         self.title_text = tk.Text(self, font=("Helvetica", 12), width=40, height=10)
         self.title_text.pack(side="top", fill="both", expand=True, padx=10, pady=10)
         self.title_text.configure(state='disabled')
@@ -82,7 +93,42 @@ class Application(ttk.Frame):
         self.model = None
         self.tokenizer = None
         self.token_max_length = 512
-
+        self.dataset = pd.read_csv("t5_finetune_model/YT-titles-transcripts-clean.csv")
+        self.random_videos = self.dataset.sample(n=5, random_state=42)
+    
+    def refresh_random_videos(self):
+        """Refresh the random videos"""
+        self.random_videos = self.dataset.sample(n=5)
+    
+    def run_on_random_videos(self):
+        """Run the model on 5 random videos from YT-titles-transcripts-clean.csv"""
+        original_titles = self.random_videos["title"].tolist()
+        generated_titles = []
+        for transcript in self.random_videos["transcript"]:
+            input_ids = self.tokenizer.encode_plus(transcript, 
+                                                    add_special_tokens=True, 
+                                                    max_length=self.token_max_length,
+                                                    padding='max_length', 
+                                                    truncation=True, 
+                                                    return_attention_mask=True, 
+                                                    return_tensors='pt')
+            output = self.model.generate(input_ids['input_ids'].to('cuda'), 
+                                        attention_mask=input_ids['attention_mask'].to('cuda'),
+                                        max_new_tokens=20,
+                                        num_beams=5,
+                                        repetition_penalty=1,
+                                        length_penalty=1,
+                                        early_stopping=True,
+                                        no_repeat_ngram_size=2,
+                                        num_return_sequences=5)
+            generated_titles.append(self.tokenizer.decode(output[0], skip_special_tokens=True))
+        self.title_text.configure(state='normal')
+        self.title_text.delete(1.0, tk.END)
+        for i in range(5):
+            self.title_text.insert(tk.END, f"Original title: {original_titles[i]}\n")
+            self.title_text.insert(tk.END, f"Generated title: {generated_titles[i]}\n\n")
+        self.title_text.configure(state='disabled')
+    
     def select_local_video(self):
         path = filedialog.askopenfilename()
         self.link_entry.delete(0, tk.END)
