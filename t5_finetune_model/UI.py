@@ -93,15 +93,29 @@ class Application(ttk.Frame):
         self.model = None
         self.tokenizer = None
         self.token_max_length = 512
-        self.dataset = pd.read_csv("t5_finetune_model/YT-titles-transcripts-clean.csv")
-        self.random_videos = self.dataset.sample(n=5, random_state=42)
+        self.dataset = None
+        self.random_videos = None
+        if os.path.exists("t5_finetune_model/YT-titles-transcripts-clean.csv"):
+            self.dataset = pd.read_csv("t5_finetune_model/YT-titles-transcripts-clean.csv")
+            self.random_videos = self.dataset.sample(n=5, random_state=42)
     
     def refresh_random_videos(self):
         """Refresh the random videos"""
-        self.random_videos = self.dataset.sample(n=5)
+        if not os.path.exists("t5_finetune_model/YT-titles-transcripts-clean.csv"):
+            return
+        if self.dataset is None:
+            self.dataset = pd.read_csv("t5_finetune_model/YT-titles-transcripts-clean.csv")
+            self.random_videos = self.dataset.sample(n=5, random_state=42)
+        else:
+            self.random_videos = self.dataset.sample(n=5)
     
     def run_on_random_videos(self):
         """Run the model on 5 random videos from YT-titles-transcripts-clean.csv"""
+        if not os.path.exists("t5_finetune_model/YT-titles-transcripts-clean.csv"):
+            return
+        if self.dataset is None:
+            self.dataset = pd.read_csv("t5_finetune_model/YT-titles-transcripts-clean.csv")
+            self.random_videos = self.dataset.sample(n=5, random_state=42)
         original_titles = self.random_videos["title"].tolist()
         generated_titles = []
         for transcript in self.random_videos["transcript"]:
