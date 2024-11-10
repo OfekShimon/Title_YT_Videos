@@ -1,2 +1,4 @@
 transformers
 streamlit
+torch
+pandas
