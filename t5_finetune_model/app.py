@@ -144,6 +144,7 @@ def main():
 
     with tab2:
         st.header("Generate titles for random videos")
+        st.header(os.listdir())
         if os.path.exists("t5_finetune_model/YT-titles-transcripts-clean.csv"):
             if 'dataset' not in st.session_state:
                 st.session_state.dataset = pd.read_csv("t5_finetune_model/YT-titles-transcripts-clean.csv")
