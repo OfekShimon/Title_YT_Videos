@@ -44,6 +44,7 @@ def main():
                        layout="wide")
 
     st.title("YouTube Video Title Generator")
+    st.header(os.listdir())
 
     if 'current_model_path' not in st.session_state:
         st.session_state.current_model_path = None
