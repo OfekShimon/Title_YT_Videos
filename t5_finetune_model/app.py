@@ -44,7 +44,8 @@ def main():
                        layout="wide")
 
     st.title("YouTube Video Title Generator")
-    os.chdir('/mount/src/title_yt_videos/t5_finetune_model')
+    if os.path.exists("/mount/src/title_yt_videos/t5_finetune_model"):
+        os.chdir('/mount/src/title_yt_videos/t5_finetune_model')
 
     if 'current_model_path' not in st.session_state:
         st.session_state.current_model_path = None
