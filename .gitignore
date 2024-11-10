@@ -166,6 +166,5 @@ data/
 *.tf
 *.pkl
 test/
-YT-titles-transcripts-clean.csv
 transcription data/
 wandb/
