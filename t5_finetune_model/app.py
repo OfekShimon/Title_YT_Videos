@@ -44,10 +44,6 @@ def main():
                        layout="wide")
 
     st.title("YouTube Video Title Generator")
-    st.header(os.listdir())
-    st.header(os.getcwd())
-    os.chdir("t5_finetune_model")
-
 
 
     if 'current_model_path' not in st.session_state:
