@@ -41,7 +41,7 @@ def generate_titles(model, tokenizer, input_text, token_max_length=512):
 
 def main():
 
-    # os.chdir("t5_finetune_model")
+    os.chdir("t5_finetune_model")
     st.set_page_config(page_title="YouTube Video Title Generator",
                        layout="wide")
 
