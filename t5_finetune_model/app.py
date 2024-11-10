@@ -53,7 +53,7 @@ def main():
     model_options = []
     if os.path.exists("t5_finetune_model/models/trained-v1"):
         model_options.append("t5-small")
-    if os.path.exists("models/flan"):
+    if os.path.exists("t5_finetune_model/models/flan"):
         model_options.append("t5-flan")
     if os.path.exists("t5_finetune_model/models/trained-base-v0"):
         model_options.append("t5-base v1")
@@ -77,7 +77,7 @@ def main():
             return
     else:
         model_path_map = {
-            "t5-flan": "models/flan/trained-model"
+            "t5-flan": "t5_finetune_model/models/flan/trained-model"
         }
         model_path = model_path_map[model_choice]
 
