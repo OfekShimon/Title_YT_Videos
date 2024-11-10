@@ -40,8 +40,8 @@ def generate_titles(model, tokenizer, input_text, token_max_length=512):
 
 
 def main():
+    st.header(os.listdir())
 
-    os.chdir("t5_finetune_model")
     st.set_page_config(page_title="YouTube Video Title Generator",
                        layout="wide")
 
@@ -64,8 +64,6 @@ def main():
         model_options.append("t5-base")
 
     if not model_options:
-        st.header("DIR")
-        st.header(os.listdir())
         st.error("No pre-trained models found!")
         return
 
