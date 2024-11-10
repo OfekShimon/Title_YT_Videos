@@ -45,7 +45,7 @@ def main():
 
     st.title("YouTube Video Title Generator")
     st.header(os.listdir())
-    st.header(os.curdir)
+    st.header(os.getcwd())
 
 
     if 'current_model_path' not in st.session_state:
