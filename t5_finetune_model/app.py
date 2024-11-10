@@ -46,7 +46,7 @@ def main():
     st.title("YouTube Video Title Generator")
     st.header(os.listdir())
     st.header(os.getcwd())
-    os.chdir("title_yt_videos")
+    os.chdir("t5_finetune_model")
 
 
 
