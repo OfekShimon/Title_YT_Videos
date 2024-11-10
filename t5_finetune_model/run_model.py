@@ -7,15 +7,15 @@ from extract_transcription import transcribe
 
 if __name__ == "__main__":
     link = 'https://www.youtube.com/watch?v=dHy-qfkO54E' # minecraft
-    data_folder = 't5_finetune_model/transcription data/'
-    audio_path = 't5_finetune_model/transcription data/audio.wav'
-    transcription_path = 't5_finetune_model/transcription data/'
+    data_folder = 'transcription data/'
+    audio_path = 'transcription data/audio.wav'
+    transcription_path = 'transcription data/'
 
     if link.startswith('https://www.youtube.com/'):
         video_id = link.split('watch?v=')[-1]
         audio_transcription_path = transcription_path + f'transcription-{video_id}.txt'
         if not os.path.exists(audio_transcription_path):
-            original_title, audio_path = extract_youtube_audio(link, 't5_finetune_model/transcription data/')
+            original_title, audio_path = extract_youtube_audio(link, 'transcription data/')
             transcribe(audio_path, audio_transcription_path)
     else:
         file_name = os.path.basename(link)
