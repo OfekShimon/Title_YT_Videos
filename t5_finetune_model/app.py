@@ -44,9 +44,9 @@ def main():
                        layout="wide")
 
     st.title("YouTube Video Title Generator")
-    os.chdir("../")
     st.header(os.listdir())
     st.header(os.getcwd())
+    os.chdir("src")
 
 
 
