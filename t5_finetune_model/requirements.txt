@@ -6,4 +6,3 @@ ffmpeg
 yt_dlp
 faster_whisper
 numpy
-random
