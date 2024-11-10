@@ -44,8 +44,6 @@ def main():
                        layout="wide")
 
     st.title("YouTube Video Title Generator")
-    st.header(os.listdir())
-    st.header(os.getcwd())
     os.chdir('/mount/src/title_yt_videos/t5_finetune_model')
 
     if 'current_model_path' not in st.session_state:
@@ -157,6 +155,7 @@ def main():
         if os.path.exists("YT-titles-transcripts-clean.csv"):
             if 'dataset' not in st.session_state:
                 st.session_state.dataset = pd.read_csv("YT-titles-transcripts-clean.csv")
+                st.header(st.session_state.dataset)
 
             if st.button("Generate Titles for 5 Random Videos"):
                 random_videos = st.session_state.dataset.sample(n=5)
