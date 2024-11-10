@@ -59,6 +59,8 @@ def main():
         model_options.append("t5-base v1")
 
     if not model_options:
+        st.header("DIR")
+        st.header(os.listdir())
         st.error("No pre-trained models found!")
         return
 
@@ -144,7 +146,6 @@ def main():
 
     with tab2:
         st.header("Generate titles for random videos")
-        st.header(os.listdir())
         if os.path.exists("t5_finetune_model/YT-titles-transcripts-clean.csv"):
             if 'dataset' not in st.session_state:
                 st.session_state.dataset = pd.read_csv("t5_finetune_model/YT-titles-transcripts-clean.csv")
