@@ -45,18 +45,21 @@ def main():
 
     st.title("YouTube Video Title Generator")
 
+    if 'current_model_path' not in st.session_state:
+        st.session_state.current_model_path = None
+
     # Sidebar for model selection
     st.sidebar.header("Model Settings")
 
     # Model selection
     print(os.listdir())
     model_options = []
-    if os.path.exists("t5_finetune_model/models/trained-v1"):
+    if os.path.exists("models/small"):
         model_options.append("t5-small")
-    if os.path.exists("t5_finetune_model/models/flan"):
+    if os.path.exists("models/flan"):
         model_options.append("t5-flan")
-    if os.path.exists("t5_finetune_model/models/trained-base-v0"):
-        model_options.append("t5-base v1")
+    if os.path.exists("models/base"):
+        model_options.append("t5-base")
 
     if not model_options:
         st.header("DIR")
@@ -77,9 +80,13 @@ def main():
             return
     else:
         model_path_map = {
-            "t5-flan": "t5_finetune_model/models/flan/trained-model"
+            "t5-flan": "models/flan/trained-model",
+            "t5-small": "models/small/trained-model",
+            "t5-base": "models/base"
+
         }
         model_path = model_path_map[model_choice]
+
 
     # Token length setting
     token_max_length = st.sidebar.number_input("Token max length",
@@ -88,10 +95,10 @@ def main():
                                                value=512)
 
     # Load model
-    if 'model' not in st.session_state:
+    if st.session_state.current_model_path != model_path:
         with st.spinner("Loading model..."):
             st.session_state.model, st.session_state.tokenizer = load_model(model_path)
-        st.success("Model loaded successfully!")
+        st.success(f"{model_choice}: Model loaded successfully!")
 
     # Main content
     tab1, tab2 = st.tabs(["Single Video", "Random Videos"])
@@ -146,9 +153,9 @@ def main():
 
     with tab2:
         st.header("Generate titles for random videos")
-        if os.path.exists("t5_finetune_model/YT-titles-transcripts-clean.csv"):
+        if os.path.exists("YT-titles-transcripts-clean.csv"):
             if 'dataset' not in st.session_state:
-                st.session_state.dataset = pd.read_csv("t5_finetune_model/YT-titles-transcripts-clean.csv")
+                st.session_state.dataset = pd.read_csv("YT-titles-transcripts-clean.csv")
 
             if st.button("Generate Titles for 5 Random Videos"):
                 random_videos = st.session_state.dataset.sample(n=5)
