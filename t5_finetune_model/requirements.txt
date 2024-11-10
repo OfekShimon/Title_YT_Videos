@@ -2,3 +2,5 @@ transformers
 streamlit
 torch
 pandas
+ffmpeg
+yt_dlp
