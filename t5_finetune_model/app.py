@@ -156,8 +156,6 @@ def main():
         if os.path.exists("YT-titles-transcripts-clean.csv"):
             if 'dataset' not in st.session_state:
                 st.session_state.dataset = pd.read_csv("YT-titles-transcripts-clean.csv")
-
-            st.header(st.session_state.dataset.shape[0])
             if st.button("Generate Titles for 5 Random Videos"):
                 random_videos = st.session_state.dataset.sample(n=5)
 
